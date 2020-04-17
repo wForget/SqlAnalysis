@@ -1,14 +1,12 @@
 package cn.wangz.sql.analysis.hive;
 
 import cn.wangz.sql.analysis.BaseSqlAnalysis;
-import cn.wangz.sql.analysis.SqlContext;
 import cn.wangz.sql.analysis.exception.AnalysisException;
 import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
-import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.parse.*;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,7 +38,7 @@ public class HiveAnalysis extends BaseSqlAnalysis {
         try {
             init();
         } catch (Throwable t) {
-            throw new AnalysisException("init hive analysis error.", t);
+            throw new AnalysisException("HiveAnalysis init error.", t);
         }
     }
 
@@ -75,8 +73,8 @@ public class HiveAnalysis extends BaseSqlAnalysis {
                 sem.analyze(tree, ctx);
                 processSemanticAnalyzer(sem);
             }
-        } catch (Throwable e) {
-            throw new AnalysisException(e);
+        } catch (Throwable t) {
+            throw new AnalysisException("HiveAnalysis analysis error.", t);
         }
     }
 
@@ -89,14 +87,7 @@ public class HiveAnalysis extends BaseSqlAnalysis {
         // TODO generate context
     }
 
-    public static void main(String[] args) throws Exception {
-//        String sql = "insert into test.wangz_test001 select * from test.wang_zh_test where name = 'wangz'";
-        String sql = "insert into test.apppkg_active_runtime_dis_monthly_tmp PARTITION (par=20200400) (apppkg,zone) select apppkg,zone from test.apppkg_active_runtime_dis_monthly_tmp where par=20190400 limit 10";
-
-        HiveAnalysis analysis = new HiveAnalysis("app");
-        analysis.analysis(sql);
-
-
+//    public static void main(String[] args) throws Exception {
 //        HiveConf conf = new HiveConf();
 //        String user = "app";
 //        UserGroupInformation.setLoginUser(UserGroupInformation.createRemoteUser(user));
@@ -120,6 +111,6 @@ public class HiveAnalysis extends BaseSqlAnalysis {
 //        HashMap<String, Table> aliasToTable = qbMetaData.getAliasToTable();
 //        Map<String, Table> nameToDestTable = qbMetaData.getNameToDestTable();
 //        System.out.println(qb.getAliases());
-    }
+//    }
 
 }

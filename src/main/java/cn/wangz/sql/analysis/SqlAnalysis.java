@@ -12,4 +12,10 @@ public interface SqlAnalysis {
 
     SqlContext getSqlContext();
 
+    SqlType getSqlType();
+
+    enum SqlType {
+        HIVE, SPARK;
+    }
+
 }

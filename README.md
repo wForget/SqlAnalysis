@@ -1,6 +1,6 @@
 ## SqlAnalysis
 
-Analyze SQL and generate some labels
+Analyze SQL and generate some labels.(根据规则分析 SQL 并生成一些标签)
 
 + 通过 hive-exec 分析 hive sql
 

@@ -6,15 +6,15 @@ import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
-import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.parse.*;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileOutputStream;
 import java.io.PrintStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Properties;
 
 /**
  * @author wang_zh
@@ -22,31 +22,39 @@ import java.util.Map;
  */
 public class HiveAnalysis extends BaseSqlAnalysis {
 
+    private static final Logger logger = LoggerFactory.getLogger(HiveAnalysis.class);
+
     HiveSqlContext context;
 
     HiveConf conf;
     ParseDriver pd;
     Context ctx;
 
+    private Properties properties;
+
     public HiveAnalysis() throws AnalysisException {
         this(null);
     }
 
-    public HiveAnalysis(String user) throws AnalysisException {
+    public HiveAnalysis(Properties properties) throws AnalysisException {
         super(new HiveSqlContext());
-        this.user = user;
+        if (properties != null) {
+            this.properties = properties;
+        } else {
+            this.properties = new Properties();
+        }
+
         try {
             init();
         } catch (Throwable t) {
             throw new AnalysisException("HiveAnalysis init error.", t);
         }
     }
-
-    private String user;
     private void init() throws Throwable {
-        if (StringUtils.isNotBlank(this.user)) {
+        String user = this.properties.getProperty("user");
+        if (StringUtils.isNotBlank(user)) {
             // set real login user
-            UserGroupInformation.setLoginUser(UserGroupInformation.createRemoteUser(this.user));
+            UserGroupInformation.setLoginUser(UserGroupInformation.createRemoteUser(user));
         }
         this.conf = new HiveConf();
         SessionState sessionState = SessionState.start(conf);
@@ -62,55 +70,26 @@ public class HiveAnalysis extends BaseSqlAnalysis {
     @Override
     public void analysis(String sql) throws AnalysisException {
         try {
-            ASTNode tree = pd.parse(sql, ctx);
-            System.out.println(tree.dump());
-            tree = ParseUtils.findRootNonNullToken(tree);
+            ASTNode rootTree = pd.parse(sql, ctx);
+            ASTNode tree = ParseUtils.findRootNonNullToken(rootTree);
+            logger.debug("ast node tree dump, ", tree.dump());
+            this.context.getASTNodeAnalysisRules().forEach(rule -> rule.analysis(tree, HiveAnalysis.this.context));
             BaseSemanticAnalyzer baseSemanticAnalyzer = SemanticAnalyzerFactory.get(conf, tree);
             if (baseSemanticAnalyzer instanceof SemanticAnalyzer) {
                 SemanticAnalyzer sem = (SemanticAnalyzer) baseSemanticAnalyzer;
                 sem.initCtx(ctx);
                 sem.init(true);
                 sem.analyze(tree, ctx);
-                processSemanticAnalyzer(sem);
+                this.context.getSemAnalysisRules().forEach(rule -> rule.analysis(sem, HiveAnalysis.this.context));
             }
         } catch (Throwable t) {
             throw new AnalysisException("HiveAnalysis analysis error.", t);
         }
     }
 
-    private void processSemanticAnalyzer(SemanticAnalyzer sem) {
-        ParseContext parseContext  = sem.getParseContext();
-        HashMap<TableScanOperator, PrunedPartitionList> opToPartList = parseContext.getOpToPartList();
-        Map<String, PrunedPartitionList> prunedPartitions = parseContext.getPrunedPartitions();
-
-        System.out.println(parseContext);
-        // TODO generate context
+    @Override
+    public SqlType getSqlType() {
+        return SqlType.HIVE;
     }
-
-//    public static void main(String[] args) throws Exception {
-//        HiveConf conf = new HiveConf();
-//        String user = "app";
-//        UserGroupInformation.setLoginUser(UserGroupInformation.createRemoteUser(user));
-//        SessionState sessionState = SessionState.start(conf);
-//        sessionState.out =
-//                new PrintStream(new FileOutputStream(sessionState.getTmpOutputFile()), true, CharEncoding.UTF_8);
-//        Context ctx = new Context(conf);
-//        ctx.setTryCount(Integer.MAX_VALUE);
-//        ctx.setHDFSCleanup(true);
-//        ParseDriver pd = new ParseDriver();
-//        ASTNode tree = pd.parse(sql, ctx);
-//        System.out.println(tree.dump());
-//        tree = ParseUtils.findRootNonNullToken(tree);
-//        SessionState.get().initTxnMgr(conf);
-//        CalcitePlanner sem = new CalcitePlanner(conf);
-//        sem.initCtx(ctx);
-//        sem.init(true);
-//        sem.analyze(tree,ctx );
-//        QB qb = sem.getQB();
-//        QBMetaData qbMetaData = qb.getMetaData();
-//        HashMap<String, Table> aliasToTable = qbMetaData.getAliasToTable();
-//        Map<String, Table> nameToDestTable = qbMetaData.getNameToDestTable();
-//        System.out.println(qb.getAliases());
-//    }
 
 }
